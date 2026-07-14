@@ -19,10 +19,10 @@
         body { background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; }
         h1 { font-size: 1.5rem; margin-bottom: 8px; text-align: center; color: #fff; }
         .subtitle { font-size: 0.9rem; color: #94a3b8; margin-bottom: 20px; text-align: center; }
-        .container { display: flex; flex-wrap: wrap; gap: 20px; max-width: 1000px; width: 100%; justify-content: center; }
-        .canvas-container { background: #05070a; border: 1px solid #263145; border-radius: 12px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        canvas { display: block; border-radius: 12px; }
-        .controls { flex: 1; min-width: 300px; background: var(--panel); padding: 20px; border-radius: 12px; border: 1px solid #263145; display: flex; flex-direction: column; gap: 16px; }
+        .container { display: flex; flex-wrap: wrap; gap: 20px; max-width: 1050px; width: 100%; justify-content: center; align-items: flex-start; }
+        .canvas-container { background: #05070a; border: 1px solid #263145; border-radius: 12px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden; display: flex; justify-content: center; }
+        canvas { display: block; border-radius: 12px; max-width: 100%; height: auto; }
+        .controls { flex: 1; min-width: 320px; background: var(--panel); padding: 20px; border-radius: 12px; border: 1px solid #263145; display: flex; flex-direction: column; gap: 16px; }
         .btn-group { display: flex; flex-direction: column; gap: 8px; }
         button { background: #1f293d; color: var(--text); border: 1px solid #334155; padding: 10px 14px; border-radius: 8px; cursor: pointer; text-align: left; transition: all 0.2s; font-weight: 500; }
         button:hover { background: #2d3b55; border-color: var(--accent); }
@@ -41,8 +41,9 @@
     <div class="subtitle">Semua orbit bergerak Berlawanan Arah Jarum Jam (CCW) sesuai realita pandangan Kutub Utara Langit</div>
 
     <div class="container">
+        <!-- Kanvas diperlebar jadi 680x540 supaya tidak kepotong -->
         <div class="canvas-container">
-            <canvas id="orbitCanvas" width="500" height="500"></canvas>
+            <canvas id="orbitCanvas" width="680" height="540"></canvas>
         </div>
 
         <div class="controls">
@@ -81,10 +82,10 @@
         const speedSlider = document.getElementById('speedSlider');
 
         let mode = 'all';
-        let moonAngle = 0;         // Sudut Bulan (CCW)
-        let sunAngle = 0;          // Sudut Matahari / gerak Bumi keliling Matahari (CCW)
-        let apsideAngle = 0;       // Presesi apse: perputaran elips (CCW - Maju)
-        let nodeAngle = 0;         // Presesi simpul: perputaran nodes (CW - Mundur)
+        let moonAngle = 0;         // Sudut Bulan
+        let sunAngle = 0;          // Sudut Matahari (gerak Bumi keliling Matahari)
+        let apsideAngle = 0;       // Presesi apse: perputaran elips
+        let nodeAngle = 0;         // Presesi simpul: perputaran nodes
 
         // Parameter Elips Orbit
         const a = 170;             // Radius mayor
@@ -109,11 +110,12 @@
         function draw() {
             const speed = parseFloat(speedSlider.value);
             
-            // Pergerakan sudut
-            moonAngle += 0.02 * speed;
-            sunAngle += (0.02 / 13.36) * speed;       
-            apsideAngle += (0.02 / 110) * speed;      
-            nodeAngle -= (0.02 / 80) * speed;         
+            // PENTING: Karena sumbu Y pada Canvas terbalik (positif di bawah),
+            // kita gunakan tanda MINUS (-=) agar rotasinya menjadi Berlawanan Arah Jarum Jam (CCW)!
+            moonAngle -= 0.02 * speed;                // Bulan mengitari Bumi (CCW)
+            sunAngle -= (0.02 / 13.36) * speed;       // Arah Matahari bergeser CCW
+            apsideAngle -= (0.02 / 110) * speed;      // Presesi Apse maju (CCW)
+            nodeAngle += (0.02 / 80) * speed;         // Presesi Simpul mundur / retrograde (CW)
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             const centerX = canvas.width / 2;
@@ -121,18 +123,18 @@
 
             // 1. Gambar Bintang Latar Belakang
             ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
-            for(let i=0; i<20; i++) {
-                ctx.fillRect((i*137)%500, (i*293)%500, 2, 2);
+            for(let i=0; i<25; i++) {
+                ctx.fillRect((i*137)%680, (i*293)%540, 2, 2);
             }
 
-            // 2. Gambar Arah Matahari
+            // 2. Gambar Arah Matahari (Patokan Sinodis)
             if (mode === 'all' || mode === 'sinodis') {
                 ctx.save();
                 ctx.translate(centerX, centerY);
                 ctx.rotate(sunAngle);
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
-                ctx.lineTo(230, 0);
+                ctx.lineTo(310, 0);
                 ctx.strokeStyle = "rgba(234, 179, 8, 0.4)";
                 ctx.lineWidth = 3;
                 ctx.setLineDash([5, 5]);
@@ -140,38 +142,39 @@
                 
                 ctx.fillStyle = "#eab308";
                 ctx.beginPath();
-                ctx.arc(230, 0, 12, 0, Math.PI * 2);
+                ctx.arc(300, 0, 13, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.fillStyle = "#fff";
-                ctx.font = "10px sans-serif";
-                ctx.fillText("Arah Matahari", 160, -10);
+                ctx.font = "11px sans-serif";
+                ctx.fillText("Arah Matahari", 220, -12);
                 ctx.restore();
             }
 
-            // 3. Gambar Simpul Orbit / Nodes
+            // 3. Gambar Simpul Orbit / Nodes (Patokan Drakonik)
             if (mode === 'all' || mode === 'drakonik') {
                 ctx.save();
                 ctx.translate(centerX, centerY);
                 ctx.rotate(nodeAngle);
                 ctx.beginPath();
-                ctx.moveTo(-220, 0);
-                ctx.lineTo(220, 0);
+                ctx.moveTo(-310, 0);
+                ctx.lineTo(310, 0);
                 ctx.strokeStyle = "#10b981";
                 ctx.lineWidth = 2;
                 ctx.stroke();
                 
                 ctx.fillStyle = "#10b981";
                 ctx.font = "11px sans-serif";
-                ctx.fillText("⚡ Simpul Naik (Ascending)", 100, -8);
-                ctx.fillText("⚡ Simpul Turun", -200, -8);
+                ctx.fillText("⚡ Simpul Naik (Ascending)", 130, -8);
+                ctx.fillText("⚡ Simpul Turun", -260, -8);
                 ctx.restore();
             }
 
-            // 4. Gambar Orbit Elips & Garis Apse
+            // 4. Gambar Orbit Elips & Garis Apse (Patokan Anomalistik)
             ctx.save();
             ctx.translate(centerX, centerY);
             ctx.rotate(apsideAngle); 
 
+            // Pusat elips digambar di (+c, 0) karena Bumi ada di titik fokus kiri (0,0)
             ctx.beginPath();
             ctx.ellipse(c, 0, a, b, 0, 0, Math.PI * 2);
             ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
@@ -187,12 +190,14 @@
                 ctx.setLineDash([3, 3]);
                 ctx.stroke();
 
+                // Marker Perigee (Kiri)
                 ctx.fillStyle = "#f43f5e";
                 ctx.beginPath();
                 ctx.arc(-a + c, 0, 6, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.fillText("Perigee", -a + c - 20, -10);
 
+                // Marker Apogee (Kanan)
                 ctx.fillStyle = "#a855f7";
                 ctx.beginPath();
                 ctx.arc(a + c, 0, 6, 0, Math.PI * 2);
@@ -200,7 +205,7 @@
                 ctx.fillText("Apogee", a + c - 15, -10);
             }
 
-            // --- PERBAIKAN RUMUS POLAR DI SINI (Tanda MINUS) ---
+            // Rumus koordinat polar elips yang sudah diperbaiki (menggunakan tanda minus)
             const e = c / a; 
             const r = (a * (1 - e * e)) / (1 - e * Math.cos(moonAngle));
             const moonX = r * Math.cos(moonAngle);
