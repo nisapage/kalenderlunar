@@ -127,26 +127,63 @@
                 ctx.fillRect((i*137)%680, (i*293)%540, 2, 2);
             }
 
-            // 2. Gambar Arah Matahari (Patokan Sinodis)
+            // 2. Gambar Arah Matahari (Patokan Sinodis) & Garis Bantu Pengejaran
             if (mode === 'all' || mode === 'sinodis') {
                 ctx.save();
                 ctx.translate(centerX, centerY);
+
+                // --- [FITUR BARU] GARIS BANTU KHUSUS DI MODE SINODIS ---
+                if (mode === 'sinodis') {
+                    // 1. Gambar Garis Referensi Awal Sideris (Sudut 0 derajat murni)
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(260, 0);
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([3, 3]);
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+                    ctx.font = "10px sans-serif";
+                    ctx.fillText("⭐ Garis Sideris (360° Murni)", 100, -8);
+
+                    // 2. Gambar Busur Arsiran Sudut Tambahan (~29°)
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.arc(0, 0, 180, sunAngle, 0, false); // dari sudut matahari ke 0 CCW
+                    ctx.closePath();
+                    ctx.fillStyle = "rgba(234, 179, 8, 0.15)"; // Arsiran emas transparan
+                    ctx.fill();
+
+                    // 3. Teks Keterangan "+2,2 Hari" di tengah arsiran sudut
+                    ctx.save();
+                    ctx.rotate(sunAngle / 2); // taruh teks tepat di tengah sudut pengejaran
+                    ctx.fillStyle = "#facc15";
+                    ctx.font = "bold 11px sans-serif";
+                    ctx.fillText("⏳ +2,2 Hari (Mengejar Matahari)", 40, -5);
+                    ctx.restore();
+                }
+                // --- [END FITUR BARU] ---
+
+                // Gambar Garis Utama Arah Matahari
                 ctx.rotate(sunAngle);
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
                 ctx.lineTo(310, 0);
-                ctx.strokeStyle = "rgba(234, 179, 8, 0.4)";
+                ctx.strokeStyle = "rgba(234, 179, 8, 0.5)";
                 ctx.lineWidth = 3;
                 ctx.setLineDash([5, 5]);
                 ctx.stroke();
                 
+                // Simbol Matahari
                 ctx.fillStyle = "#eab308";
                 ctx.beginPath();
                 ctx.arc(300, 0, 13, 0, Math.PI * 2);
                 ctx.fill();
+                
                 ctx.fillStyle = "#fff";
                 ctx.font = "11px sans-serif";
-                ctx.fillText("Arah Matahari", 220, -12);
+                ctx.fillText("☀️ Arah Matahari (Fase Bulan Baru)", 180, -12);
                 ctx.restore();
             }
 
