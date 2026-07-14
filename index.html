@@ -18,7 +18,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; }
         h1 { font-size: 1.5rem; margin-bottom: 8px; text-align: center; color: #fff; }
-        .subtitle { font-size: 0.9rem; color: #94a3b8; margin-bottom: 20px; text-align: center; }
+        .subtitle { font-size: 0.9rem; color: #94a3b8; margin-bottom: 16px; text-align: center; }
         .container { display: flex; flex-wrap: wrap; gap: 20px; max-width: 1050px; width: 100%; justify-content: center; align-items: flex-start; }
         .canvas-container { background: #05070a; border: 1px solid #263145; border-radius: 12px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden; display: flex; justify-content: center; }
         canvas { display: block; border-radius: 12px; max-width: 100%; height: auto; }
@@ -33,6 +33,25 @@
         .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
         .slider-group { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; color: #94a3b8; }
         input[type=range] { flex: 1; accent-color: var(--accent); }
+        
+        /* Box Indikator Status Waktu */
+        .status-box {
+            background: #1e293b;
+            border: 1px solid #334155;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            text-align: center;
+            font-weight: bold;
+            color: #38bdf8;
+            transition: all 0.3s;
+        }
+        .status-box.hijri {
+            background: rgba(234, 179, 8, 0.2);
+            border-color: #facc15;
+            color: #fde047;
+            transform: scale(1.02);
+        }
     </style>
 </head>
 <body>
@@ -41,12 +60,17 @@
     <div class="subtitle">Semua orbit bergerak Berlawanan Arah Jarum Jam (CCW) sesuai realita pandangan Kutub Utara Langit</div>
 
     <div class="container">
-        <!-- Kanvas diperlebar jadi 680x540 supaya tidak kepotong -->
         <div class="canvas-container">
             <canvas id="orbitCanvas" width="680" height="540"></canvas>
         </div>
 
         <div class="controls">
+            <!-- INI DIA: BOX KETERANGAN WAKTU REAL-TIME -->
+            <div id="statusBox" class="status-box">
+                ⏱️ Waktu Orbit: Hari ke-0.00
+                <div style="font-size: 0.75rem; font-weight: normal; margin-top: 4px; color: #94a3b8;">Siklus mengelilingi Bumi sedang berlangsung...</div>
+            </div>
+
             <div class="btn-group">
                 <button class="active" onclick="setMode('all')">🌐 Tampilkan Semua (Perbandingan)</button>
                 <button onclick="setMode('sideris')">⭐ Bulan Sideris (27,32 Hari) - Patokan Bintang</button>
@@ -80,12 +104,15 @@
         const ctx = canvas.getContext('2d');
         const infoText = document.getElementById('infoText');
         const speedSlider = document.getElementById('speedSlider');
+        const statusBox = document.getElementById('statusBox');
 
         let mode = 'all';
         let moonAngle = 0;         // Sudut Bulan
         let sunAngle = 0;          // Sudut Matahari (gerak Bumi keliling Matahari)
-        let apsideAngle = 0;       // Presesi apse: perputaran elips
-        let nodeAngle = 0;         // Presesi simpul: perputaran nodes
+        let apsideAngle = 0;       // Presesi apse
+        let nodeAngle = 0;         // Presesi simpul
+        
+        let dayCounter = 0;        // Penghitung hari nyata
 
         // Parameter Elips Orbit
         const a = 170;             // Radius mayor
@@ -95,7 +122,7 @@
         const descriptions = {
             all: "<strong>Mode Semua:</strong> Memperlihatkan animasi lengkap sistem Bumi-Bulan-Matahari. Perhatikan bagaimana setiap titik patokan (Matahari, Perigee, dan Simpul) terus bergerak dan menghasilkan durasi bulan yang berbeda-beda.",
             sideris: "<strong>Bulan Sideris (27,32 Hari):</strong> Waktu murni yang dibutuhkan Bulan untuk menempuh orbit tepat 360° mengelilingi Bumi terhadap posisi bintang tetap di alam semesta.",
-            sinodis: "<strong>Bulan Sinodis (29,53 Hari):</strong> Siklus dari Bulan Baru ke Bulan Baru berikutnya. Karena Bumi juga bergerak mengelilingi Matahari (CCW), Bulan butuh ekstra waktu ~2,2 hari (menempuh total ~389°) untuk mengejar posisi sejajar dengan Matahari.",
+            sinodis: "<strong>Bulan Sinodis (29,53 Hari):</strong> Siklus dari Bulan Baru ke Bulan Baru berikutnya (Dasar Kalender Hijriah!). Setelah Hari ke-27,32 (Sideris selesai), Bulan wajib berlari EKSTRA 2,2 hari lagi untuk mengejar Matahari yang sudah bergeser maju!",
             anomalistik: "<strong>Bulan Anomalistik (27,55 Hari):</strong> Waktu dari titik Perigee (terdekat) kembali ke Perigee. Karena orbit elips Bulan mengalami presesi maju (CCW), titik Perigee terus bergeser ke depan, sehingga Bulan harus mengorbit sedikit lebih dari 360°.",
             drakonik: "<strong>Bulan Drakonik / Nodical (27,21 Hari):</strong> Waktu dari Simpul Naik (potongan orbit) kembali ke Simpul Naik. Karena bidang orbit Bulan mengalami presesi mundur/retrograde (CW), Bulan bertemu simpul sebelum mencapai orbit 360°!"
         };
@@ -105,17 +132,41 @@
             infoText.innerHTML = descriptions[newMode];
             document.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
             event.currentTarget.classList.add('active');
+            
+            // Reset posisi waktu ganti mode agar langsung terlihat jelas
+            moonAngle = 0;
+            sunAngle = 0;
+            apsideAngle = 0;
+            nodeAngle = 0;
+            dayCounter = 0;
         }
 
         function draw() {
             const speed = parseFloat(speedSlider.value);
             
-            // PENTING: Karena sumbu Y pada Canvas terbalik (positif di bawah),
-            // kita gunakan tanda MINUS (-=) agar rotasinya menjadi Berlawanan Arah Jarum Jam (CCW)!
-            moonAngle -= 0.02 * speed;                // Bulan mengitari Bumi (CCW)
-            sunAngle -= (0.02 / 13.36) * speed;       // Arah Matahari bergeser CCW
-            apsideAngle -= (0.02 / 110) * speed;      // Presesi Apse maju (CCW)
-            nodeAngle += (0.02 / 80) * speed;         // Presesi Simpul mundur / retrograde (CW)
+            // Kecepatan putaran sudut (CCW karena sumbu Y terbalik, jadi dikurang '-=')
+            // Kita kalibrasi supaya 1 putaran penuh (360 derajat / 2*PI) setara dengan 27.32 hari
+            const angleSpeed = 0.015 * speed;
+            moonAngle -= angleSpeed;
+            sunAngle -= (angleSpeed / 13.36);       // Matahari bergeser CCW
+            apsideAngle -= (angleSpeed / 110);      // Presesi Apse maju (CCW)
+            nodeAngle += (angleSpeed / 80);         // Presesi Simpul mundur / retrograde (CW)
+
+            // Hitung pertambahan hari (27.32 hari untuk 1 putaran 2*PI radian)
+            dayCounter += (angleSpeed / (Math.PI * 2)) * 27.32;
+            if (dayCounter >= 29.53) {
+                dayCounter = 0; // Reset siklus setelah Bulan Baru (Hijriah selesai)
+                moonAngle = sunAngle; // Sinkronkan ulang di posisi Bulan Baru
+            }
+
+            // UPDATE BOX STATIS DI KANAN
+            if (dayCounter <= 27.32) {
+                statusBox.className = "status-box";
+                statusBox.innerHTML = `⏱️ Waktu Orbit: Hari ke-${dayCounter.toFixed(2)}<div style="font-size: 0.75rem; font-weight: normal; margin-top: 4px; color: #94a3b8;">Menuju 1 putaran murni 360° (Sideris)...</div>`;
+            } else {
+                statusBox.className = "status-box hijri";
+                statusBox.innerHTML = `🌙 HARI KE-${dayCounter.toFixed(2)} (Fase Nyusul!)<div style="font-size: 0.75rem; font-weight: bold; margin-top: 4px; color: #fff;">+2,2 Hari Menuju Bulan Baru (Kalender Hijriah)</div>`;
+            }
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             const centerX = canvas.width / 2;
@@ -127,43 +178,31 @@
                 ctx.fillRect((i*137)%680, (i*293)%540, 2, 2);
             }
 
-            // 2. Gambar Arah Matahari (Patokan Sinodis) & Garis Bantu Pengejaran
+            // 2. Gambar Arah Matahari & ARSIRAN NYUSUL 2,2 HARI
             if (mode === 'all' || mode === 'sinodis') {
                 ctx.save();
                 ctx.translate(centerX, centerY);
 
-                // --- [FITUR BARU] GARIS BANTU KHUSUS DI MODE SINODIS ---
-                if (mode === 'sinodis') {
-                    // 1. Gambar Garis Referensi Awal Sideris (Sudut 0 derajat murni)
+                // --- [FITUR ARSIRAN LOGIKA HIJRIAH] ---
+                // Arsiran kuning HANYA muncul jika usia bulan sudah lewat 27.32 hari (sedang masa nyusul 2,2 hari)
+                if (dayCounter > 27.32) {
                     ctx.beginPath();
                     ctx.moveTo(0, 0);
-                    ctx.lineTo(260, 0);
-                    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-                    ctx.lineWidth = 1.5;
-                    ctx.setLineDash([3, 3]);
-                    ctx.stroke();
-                    
-                    ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
-                    ctx.font = "10px sans-serif";
-                    ctx.fillText("⭐ Garis Sideris (360° Murni)", 100, -8);
-
-                    // 2. Gambar Busur Arsiran Sudut Tambahan (~29°)
-                    ctx.beginPath();
-                    ctx.moveTo(0, 0);
-                    ctx.arc(0, 0, 180, sunAngle, 0, false); // dari sudut matahari ke 0 CCW
+                    // Gambar busur dari sudut Bulan saat ini (yang lagi nyusul) sampai ke sudut Matahari
+                    ctx.arc(0, 0, 240, sunAngle, moonAngle, false); 
                     ctx.closePath();
-                    ctx.fillStyle = "rgba(234, 179, 8, 0.15)"; // Arsiran emas transparan
+                    ctx.fillStyle = "rgba(234, 179, 8, 0.25)"; // Arsiran Emas Menyala
                     ctx.fill();
 
-                    // 3. Teks Keterangan "+2,2 Hari" di tengah arsiran sudut
+                    // Teks Keterangan di dekat Bulan yang sedang berlari nyusul
                     ctx.save();
-                    ctx.rotate(sunAngle / 2); // taruh teks tepat di tengah sudut pengejaran
+                    ctx.rotate((sunAngle + moonAngle) / 2);
                     ctx.fillStyle = "#facc15";
-                    ctx.font = "bold 11px sans-serif";
-                    ctx.fillText("⏳ +2,2 Hari (Mengejar Matahari)", 40, -5);
+                    ctx.font = "bold 12px sans-serif";
+                    ctx.fillText("⏳ +2,2 Hari Nyusul Matahari (Hijriah)!", 50, -5);
                     ctx.restore();
                 }
-                // --- [END FITUR BARU] ---
+                // --- [END FITUR ARSIRAN] ---
 
                 // Gambar Garis Utama Arah Matahari
                 ctx.rotate(sunAngle);
@@ -183,11 +222,11 @@
                 
                 ctx.fillStyle = "#fff";
                 ctx.font = "11px sans-serif";
-                ctx.fillText("☀️ Arah Matahari (Fase Bulan Baru)", 180, -12);
+                ctx.fillText("☀️ Arah Matahari (Bulan Baru / 1 Hijriah)", 170, -12);
                 ctx.restore();
             }
 
-            // 3. Gambar Simpul Orbit / Nodes (Patokan Drakonik)
+            // 3. Gambar Simpul Orbit / Nodes
             if (mode === 'all' || mode === 'drakonik') {
                 ctx.save();
                 ctx.translate(centerX, centerY);
@@ -206,19 +245,17 @@
                 ctx.restore();
             }
 
-            // 4. Gambar Orbit Elips & Garis Apse (Patokan Anomalistik)
+            // 4. Gambar Orbit Elips & Garis Apse
             ctx.save();
             ctx.translate(centerX, centerY);
             ctx.rotate(apsideAngle); 
 
-            // Pusat elips digambar di (+c, 0) karena Bumi ada di titik fokus kiri (0,0)
             ctx.beginPath();
             ctx.ellipse(c, 0, a, b, 0, 0, Math.PI * 2);
             ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Titik Perigee & Apogee
             if (mode === 'all' || mode === 'anomalistik') {
                 ctx.beginPath();
                 ctx.moveTo(-a + c, 0);
@@ -227,14 +264,12 @@
                 ctx.setLineDash([3, 3]);
                 ctx.stroke();
 
-                // Marker Perigee (Kiri)
                 ctx.fillStyle = "#f43f5e";
                 ctx.beginPath();
                 ctx.arc(-a + c, 0, 6, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.fillText("Perigee", -a + c - 20, -10);
 
-                // Marker Apogee (Kanan)
                 ctx.fillStyle = "#a855f7";
                 ctx.beginPath();
                 ctx.arc(a + c, 0, 6, 0, Math.PI * 2);
@@ -242,9 +277,9 @@
                 ctx.fillText("Apogee", a + c - 15, -10);
             }
 
-            // Rumus koordinat polar elips yang sudah diperbaiki (menggunakan tanda minus)
+            // Rumus koordinat polar elips (minus agar sesuai orbit)
             const e = c / a; 
-            const r = (a * (1 - e * e)) / (1 - e * Math.cos(moonAngle));
+            const r = (a * (1 - e * e)) / (1 - e * Math.cos(moonAngle - apsideAngle));
             const moonX = r * Math.cos(moonAngle);
             const moonY = r * Math.sin(moonAngle);
 
@@ -268,7 +303,7 @@
             
             ctx.restore(); 
 
-            // 5. Gambar Bumi di Pusat Layar (Fokus Elips)
+            // 5. Gambar Bumi di Pusat Layar
             ctx.fillStyle = "#3b82f6";
             ctx.shadowColor = "#38bdf8";
             ctx.shadowBlur = 15;
