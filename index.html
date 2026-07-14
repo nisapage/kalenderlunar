@@ -86,7 +86,7 @@
         let apsideAngle = 0;       // Presesi apse: perputaran elips (CCW - Maju)
         let nodeAngle = 0;         // Presesi simpul: perputaran nodes (CW - Mundur)
 
-        // Parameter Elips Orbit (sengaja dibuat sangat oval agar perigee/apogee jelas)
+        // Parameter Elips Orbit
         const a = 170;             // Radius mayor
         const b = 120;             // Radius minor
         const c = Math.sqrt(a*a - b*b); // Jarak fokus ke pusat elips (~120.4)
@@ -109,23 +109,23 @@
         function draw() {
             const speed = parseFloat(speedSlider.value);
             
-            // Pergerakan sudut (Semua orbit utama CCW / bertambah)
+            // Pergerakan sudut
             moonAngle += 0.02 * speed;
-            sunAngle += (0.02 / 13.36) * speed;       // Bumi mengitari Matahari ~13x lebih lambat dari Bulan
-            apsideAngle += (0.02 / 110) * speed;      // Presesi Apse (CCW / maju sangat lambat)
-            nodeAngle -= (0.02 / 80) * speed;         // Presesi Simpul (CW / mundur retrograde)
+            sunAngle += (0.02 / 13.36) * speed;       
+            apsideAngle += (0.02 / 110) * speed;      
+            nodeAngle -= (0.02 / 80) * speed;         
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
 
-            // 1. Gambar Bintang Latar Belakang (Patokan Sideris)
+            // 1. Gambar Bintang Latar Belakang
             ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
             for(let i=0; i<20; i++) {
                 ctx.fillRect((i*137)%500, (i*293)%500, 2, 2);
             }
 
-            // 2. Gambar Arah Matahari (Patokan Sinodis)
+            // 2. Gambar Arah Matahari
             if (mode === 'all' || mode === 'sinodis') {
                 ctx.save();
                 ctx.translate(centerX, centerY);
@@ -138,7 +138,6 @@
                 ctx.setLineDash([5, 5]);
                 ctx.stroke();
                 
-                // Simbol Matahari
                 ctx.fillStyle = "#eab308";
                 ctx.beginPath();
                 ctx.arc(230, 0, 12, 0, Math.PI * 2);
@@ -149,7 +148,7 @@
                 ctx.restore();
             }
 
-            // 3. Gambar Simpul Orbit / Nodes (Patokan Drakonik)
+            // 3. Gambar Simpul Orbit / Nodes
             if (mode === 'all' || mode === 'drakonik') {
                 ctx.save();
                 ctx.translate(centerX, centerY);
@@ -168,21 +167,19 @@
                 ctx.restore();
             }
 
-            // 4. Gambar Orbit Elips & Garis Apse (Patokan Anomalistik)
+            // 4. Gambar Orbit Elips & Garis Apse
             ctx.save();
             ctx.translate(centerX, centerY);
-            ctx.rotate(apsideAngle); // Putar elips sesuai presesi apse
+            ctx.rotate(apsideAngle); 
 
-            // Karena Bumi ada di fokus F1 (-c, 0), maka pusat elips digambar di (+c, 0)
             ctx.beginPath();
             ctx.ellipse(c, 0, a, b, 0, 0, Math.PI * 2);
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Titik Perigee (Terdekat dari Bumi) & Apogee (Terjauh)
+            // Titik Perigee & Apogee
             if (mode === 'all' || mode === 'anomalistik') {
-                // Garis Apsides
                 ctx.beginPath();
                 ctx.moveTo(-a + c, 0);
                 ctx.lineTo(a + c, 0);
@@ -190,14 +187,12 @@
                 ctx.setLineDash([3, 3]);
                 ctx.stroke();
 
-                // Marker Perigee
                 ctx.fillStyle = "#f43f5e";
                 ctx.beginPath();
                 ctx.arc(-a + c, 0, 6, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.fillText("Perigee", -a + c - 20, -10);
 
-                // Marker Apogee
                 ctx.fillStyle = "#a855f7";
                 ctx.beginPath();
                 ctx.arc(a + c, 0, 6, 0, Math.PI * 2);
@@ -205,10 +200,9 @@
                 ctx.fillText("Apogee", a + c - 15, -10);
             }
 
-            // Hitung posisi Bulan pada orbit elips
-            // Jarak r dari fokus berdasarkan rumus polar elips: r = a*(1 - e^2) / (1 + e*cos(theta))
-            const e = c / a; // eksentrisitas
-            const r = (a * (1 - e * e)) / (1 + e * Math.cos(moonAngle));
+            // --- PERBAIKAN RUMUS POLAR DI SINI (Tanda MINUS) ---
+            const e = c / a; 
+            const r = (a * (1 - e * e)) / (1 - e * Math.cos(moonAngle));
             const moonX = r * Math.cos(moonAngle);
             const moonY = r * Math.sin(moonAngle);
 
@@ -228,9 +222,9 @@
             ctx.beginPath();
             ctx.arc(moonX, moonY, 8, 0, Math.PI * 2);
             ctx.fill();
-            ctx.shadowBlur = 0; // reset shadow
+            ctx.shadowBlur = 0; 
             
-            ctx.restore(); // Kembali ke koordinat normal layar
+            ctx.restore(); 
 
             // 5. Gambar Bumi di Pusat Layar (Fokus Elips)
             ctx.fillStyle = "#3b82f6";
