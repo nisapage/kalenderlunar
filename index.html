@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulasi 4 Jenis Bulan Lunar - Orbit Elips</title>
+    <style>
+        :root {
+            --bg: #0b0e14;
+            --panel: #161b26;
+            --text: #e2e8f0;
+            --accent: #38bdf8;
+            --perigee: #f43f5e;
+            --apogee: #a855f7;
+            --sun: #eab308;
+            --node: #10b981;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; }
+        h1 { font-size: 1.5rem; margin-bottom: 8px; text-align: center; color: #fff; }
+        .subtitle { font-size: 0.9rem; color: #94a3b8; margin-bottom: 20px; text-align: center; }
+        .container { display: flex; flex-wrap: wrap; gap: 20px; max-width: 1000px; width: 100%; justify-content: center; }
+        .canvas-container { background: #05070a; border: 1px solid #263145; border-radius: 12px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        canvas { display: block; border-radius: 12px; }
+        .controls { flex: 1; min-width: 300px; background: var(--panel); padding: 20px; border-radius: 12px; border: 1px solid #263145; display: flex; flex-direction: column; gap: 16px; }
+        .btn-group { display: flex; flex-direction: column; gap: 8px; }
+        button { background: #1f293d; color: var(--text); border: 1px solid #334155; padding: 10px 14px; border-radius: 8px; cursor: pointer; text-align: left; transition: all 0.2s; font-weight: 500; }
+        button:hover { background: #2d3b55; border-color: var(--accent); }
+        button.active { background: rgba(56, 189, 248, 0.15); border-color: var(--accent); color: #fff; font-weight: bold; }
+        .info-panel { background: #0f141f; padding: 14px; border-radius: 8px; border-left: 4px solid var(--accent); font-size: 0.9rem; line-height: 1.5; color: #cbd5e1; }
+        .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.8rem; margin-top: auto; border-top: 1px solid #263145; padding-top: 14px; }
+        .legend-item { display: flex; align-items: center; gap: 8px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .slider-group { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; color: #94a3b8; }
+        input[type=range] { flex: 1; accent-color: var(--accent); }
+    </style>
+</head>
+<body>
+
+    <h1>Simulasi Orbit Elips & 4 Definisi Bulan</h1>
+    <div class="subtitle">Semua orbit bergerak Berlawanan Arah Jarum Jam (CCW) sesuai realita pandangan Kutub Utara Langit</div>
+
+    <div class="container">
+        <div class="canvas-container">
+            <canvas id="orbitCanvas" width="500" height="500"></canvas>
+        </div>
+
+        <div class="controls">
+            <div class="btn-group">
+                <button class="active" onclick="setMode('all')">🌐 Tampilkan Semua (Perbandingan)</button>
+                <button onclick="setMode('sideris')">⭐ Bulan Sideris (27,32 Hari) - Patokan Bintang</button>
+                <button onclick="setMode('sinodis')">☀️ Bulan Sinodis (29,53 Hari) - Patokan Matahari</button>
+                <button onclick="setMode('anomalistik')">🚀 Bulan Anomalistik (27,55 Hari) - Patokan Perigee</button>
+                <button onclick="setMode('drakonik')">🌑 Bulan Drakonik (27,21 Hari) - Patokan Simpul</button>
+            </div>
+
+            <div class="info-panel" id="infoText">
+                <strong>Mode Semua:</strong> Memperlihatkan bagaimana orbit Bulan yang elips berputar maju (CCW), simpul orbit berputar mundur (CW), dan Matahari bergeser CCW saat Bumi mengorbit Matahari.
+            </div>
+
+            <div class="slider-group">
+                <span>Kecepatan:</span>
+                <input type="range" id="speedSlider" min="0.5" max="3" step="0.1" value="1">
+            </div>
+
+            <div class="legend">
+                <div class="legend-item"><span class="dot" style="background: #3b82f6;"></span> Bumi (Fokus Elips)</div>
+                <div class="legend-item"><span class="dot" style="background: #e2e8f0;"></span> Bulan</div>
+                <div class="legend-item"><span class="dot" style="background: var(--perigee);"></span> Titik Perigee (Terdekat)</div>
+                <div class="legend-item"><span class="dot" style="background: var(--apogee);"></span> Titik Apogee (Terjauh)</div>
+                <div class="legend-item"><span class="dot" style="background: var(--sun);"></span> Arah Matahari</div>
+                <div class="legend-item"><span class="dot" style="background: var(--node);"></span> Simpul Orbit (Nodes)</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('orbitCanvas');
+        const ctx = canvas.getContext('2d');
+        const infoText = document.getElementById('infoText');
+        const speedSlider = document.getElementById('speedSlider');
+
+        let mode = 'all';
+        let moonAngle = 0;         // Sudut Bulan (CCW)
+        let sunAngle = 0;          // Sudut Matahari / gerak Bumi keliling Matahari (CCW)
+        let apsideAngle = 0;       // Presesi apse: perputaran elips (CCW - Maju)
+        let nodeAngle = 0;         // Presesi simpul: perputaran nodes (CW - Mundur)
+
+        // Parameter Elips Orbit (sengaja dibuat sangat oval agar perigee/apogee jelas)
+        const a = 170;             // Radius mayor
+        const b = 120;             // Radius minor
+        const c = Math.sqrt(a*a - b*b); // Jarak fokus ke pusat elips (~120.4)
+
+        const descriptions = {
+            all: "<strong>Mode Semua:</strong> Memperlihatkan animasi lengkap sistem Bumi-Bulan-Matahari. Perhatikan bagaimana setiap titik patokan (Matahari, Perigee, dan Simpul) terus bergerak dan menghasilkan durasi bulan yang berbeda-beda.",
+            sideris: "<strong>Bulan Sideris (27,32 Hari):</strong> Waktu murni yang dibutuhkan Bulan untuk menempuh orbit tepat 360° mengelilingi Bumi terhadap posisi bintang tetap di alam semesta.",
+            sinodis: "<strong>Bulan Sinodis (29,53 Hari):</strong> Siklus dari Bulan Baru ke Bulan Baru berikutnya. Karena Bumi juga bergerak mengelilingi Matahari (CCW), Bulan butuh ekstra waktu ~2,2 hari (menempuh total ~389°) untuk mengejar posisi sejajar dengan Matahari.",
+            anomalistik: "<strong>Bulan Anomalistik (27,55 Hari):</strong> Waktu dari titik Perigee (terdekat) kembali ke Perigee. Karena orbit elips Bulan mengalami presesi maju (CCW), titik Perigee terus bergeser ke depan, sehingga Bulan harus mengorbit sedikit lebih dari 360°.",
+            drakonik: "<strong>Bulan Drakonik / Nodical (27,21 Hari):</strong> Waktu dari Simpul Naik (potongan orbit) kembali ke Simpul Naik. Karena bidang orbit Bulan mengalami presesi mundur/retrograde (CW), Bulan bertemu simpul sebelum mencapai orbit 360°!"
+        };
+
+        function setMode(newMode) {
+            mode = newMode;
+            infoText.innerHTML = descriptions[newMode];
+            document.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+        }
+
+        function draw() {
+            const speed = parseFloat(speedSlider.value);
+            
+            // Pergerakan sudut (Semua orbit utama CCW / bertambah)
+            moonAngle += 0.02 * speed;
+            sunAngle += (0.02 / 13.36) * speed;       // Bumi mengitari Matahari ~13x lebih lambat dari Bulan
+            apsideAngle += (0.02 / 110) * speed;      // Presesi Apse (CCW / maju sangat lambat)
+            nodeAngle -= (0.02 / 80) * speed;         // Presesi Simpul (CW / mundur retrograde)
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            // 1. Gambar Bintang Latar Belakang (Patokan Sideris)
+            ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+            for(let i=0; i<20; i++) {
+                ctx.fillRect((i*137)%500, (i*293)%500, 2, 2);
+            }
+
+            // 2. Gambar Arah Matahari (Patokan Sinodis)
+            if (mode === 'all' || mode === 'sinodis') {
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(sunAngle);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(230, 0);
+                ctx.strokeStyle = "rgba(234, 179, 8, 0.4)";
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                
+                // Simbol Matahari
+                ctx.fillStyle = "#eab308";
+                ctx.beginPath();
+                ctx.arc(230, 0, 12, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "#fff";
+                ctx.font = "10px sans-serif";
+                ctx.fillText("Arah Matahari", 160, -10);
+                ctx.restore();
+            }
+
+            // 3. Gambar Simpul Orbit / Nodes (Patokan Drakonik)
+            if (mode === 'all' || mode === 'drakonik') {
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(nodeAngle);
+                ctx.beginPath();
+                ctx.moveTo(-220, 0);
+                ctx.lineTo(220, 0);
+                ctx.strokeStyle = "#10b981";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                ctx.fillStyle = "#10b981";
+                ctx.font = "11px sans-serif";
+                ctx.fillText("⚡ Simpul Naik (Ascending)", 100, -8);
+                ctx.fillText("⚡ Simpul Turun", -200, -8);
+                ctx.restore();
+            }
+
+            // 4. Gambar Orbit Elips & Garis Apse (Patokan Anomalistik)
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(apsideAngle); // Putar elips sesuai presesi apse
+
+            // Karena Bumi ada di fokus F1 (-c, 0), maka pusat elips digambar di (+c, 0)
+            ctx.beginPath();
+            ctx.ellipse(c, 0, a, b, 0, 0, Math.PI * 2);
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Titik Perigee (Terdekat dari Bumi) & Apogee (Terjauh)
+            if (mode === 'all' || mode === 'anomalistik') {
+                // Garis Apsides
+                ctx.beginPath();
+                ctx.moveTo(-a + c, 0);
+                ctx.lineTo(a + c, 0);
+                ctx.strokeStyle = "rgba(168, 85, 247, 0.3)";
+                ctx.setLineDash([3, 3]);
+                ctx.stroke();
+
+                // Marker Perigee
+                ctx.fillStyle = "#f43f5e";
+                ctx.beginPath();
+                ctx.arc(-a + c, 0, 6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillText("Perigee", -a + c - 20, -10);
+
+                // Marker Apogee
+                ctx.fillStyle = "#a855f7";
+                ctx.beginPath();
+                ctx.arc(a + c, 0, 6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillText("Apogee", a + c - 15, -10);
+            }
+
+            // Hitung posisi Bulan pada orbit elips
+            // Jarak r dari fokus berdasarkan rumus polar elips: r = a*(1 - e^2) / (1 + e*cos(theta))
+            const e = c / a; // eksentrisitas
+            const r = (a * (1 - e * e)) / (1 + e * Math.cos(moonAngle));
+            const moonX = r * Math.cos(moonAngle);
+            const moonY = r * Math.sin(moonAngle);
+
+            // Gambar Garis Hubung Bumi-Bulan
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(moonX, moonY);
+            ctx.strokeStyle = "rgba(56, 189, 248, 0.3)";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([]);
+            ctx.stroke();
+
+            // Gambar Bulan
+            ctx.fillStyle = "#f8fafc";
+            ctx.shadowColor = "#fff";
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(moonX, moonY, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0; // reset shadow
+            
+            ctx.restore(); // Kembali ke koordinat normal layar
+
+            // 5. Gambar Bumi di Pusat Layar (Fokus Elips)
+            ctx.fillStyle = "#3b82f6";
+            ctx.shadowColor = "#38bdf8";
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 14, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            requestAnimationFrame(draw);
+        }
+
+        draw();
+    </script>
+</body>
+</html>
